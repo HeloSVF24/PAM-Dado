@@ -1,0 +1,171 @@
+package com.example.diceroller
+
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.diceroller.ui.theme.DiceRollerTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.random.Random
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            DiceRollerTheme {
+                DiceRollerApp()
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+fun DiceRollerApp() {
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFE1BEE7),
+            Color(0xFFFFFFFF)
+        )
+    )
+
+    var result by remember { mutableStateOf(1) }
+    var userGuess by remember { mutableStateOf("") }
+    var showConfetti by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val imageResource = when (result) {
+        1 -> R.drawable.dice_1
+        2 -> R.drawable.dice_2
+        3 -> R.drawable.dice_3
+        4 -> R.drawable.dice_4
+        5 -> R.drawable.dice_5
+        else -> R.drawable.dice_6
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradientBrush)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            OutlinedTextField(
+                value = userGuess,
+                onValueChange = { userGuess = it },
+                label = { Text("Digite um número entre 1 a 6") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Image(
+                painter = painterResource(imageResource),
+                contentDescription = result.toString()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    val guessInt = userGuess.toIntOrNull()
+                    if (guessInt == null) {
+                        Toast.makeText(context, "Digite um número válido!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        result = (1..6).random()
+                        if (guessInt == result) {
+                            Toast.makeText(context, "Parabéns! Você acertou!", Toast.LENGTH_LONG).show()
+                            scope.launch {
+                                showConfetti = true
+                                delay(4000)
+                                showConfetti = false
+                            }
+                        } else {
+                            Toast.makeText(context, "Errou! O dado caiu em $result", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            ) {
+                Text(text = stringResource(R.string.roll), fontSize = 24.sp)
+            }
+        }
+
+        if (showConfetti) {
+            ConfettiEffect()
+        }
+    }
+}
+
+@Composable
+fun ConfettiEffect() {
+    val infiniteTransition = rememberInfiniteTransition(label = "confetti")
+    val colors = listOf(Color.Red, Color.Yellow, Color.Blue, Color.Cyan, Color.Magenta, Color.Green, Color.Black)
+
+    val particles = remember {
+        List(100) {
+            Quad(
+                xRel = Random.nextFloat(),
+                yOffset = Random.nextFloat() * -1.5f,
+                speed = Random.nextInt(2000, 4000),
+                color = colors.random(),
+                size = Random.nextFloat() * 12f + 6f
+            )
+        }
+    }
+
+    val progress by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "progress"
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        particles.forEach { particle ->
+            val x = particle.xRel * size.width
+            val y = ((particle.yOffset + progress) % 2.5f) * size.height
+
+            if (y > -50f && y < size.height + 50f) {
+                drawRect(
+                    color = particle.color,
+                    topLeft = Offset(x, y),
+                    size = Size(particle.size, particle.size)
+                )
+            }
+        }
+    }
+}
+
+data class Quad(val xRel: Float, val yOffset: Float, val speed: Int, val color: Color, val size: Float)
